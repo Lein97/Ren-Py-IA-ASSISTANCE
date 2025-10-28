@@ -242,7 +242,8 @@
         // Global variables provided by the Canvas environment
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
         const apiKey = ""; // API key will be automatically provided at runtime
-        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+        const firebaseConfigString = typeof __firebase_config !== 'undefined' ? __firebase_config : '{}';
+        const firebaseConfig = JSON.parse(firebaseConfigString);
         const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
 
         let db = null;
@@ -282,6 +283,13 @@
         // ----------------------------------------------------
 
         async function initFirebase() {
+            // CRITICAL FIX: Check if Firebase config is actually present.
+            // If running on GitHub Pages (or outside Canvas), the config will be an empty object {}.
+            if (!firebaseConfig || Object.keys(firebaseConfig).length === 0) {
+                switchToLocalMode("Configuración de Firebase faltante o inválida. Usando modo local por defecto.");
+                return;
+            }
+
             try {
                 const app = initializeApp(firebaseConfig);
                 db = getFirestore(app);
@@ -309,7 +317,7 @@
                 });
 
             } catch (error) {
-                // If initialization fails (e.g., config error), switch to local mode
+                // If initialization fails (e.g., network error or bad config keys), switch to local mode
                 switchToLocalMode(`Error al inicializar Firebase: ${error.message}. Usando modo local.`);
             }
         }
@@ -331,9 +339,11 @@
             const chats = getLocalChats();
             renderChatList(chats);
             if (chats.length > 0) {
+                // Load the first chat
                 loadChat(chats[0].id, chats[0].title, chats[0].history || []);
             } else {
-                createNewChat('Bienvenido', false); // Create a new local chat
+                // Create a new local chat if none exist
+                createNewChat('Bienvenido', false); 
             }
         }
         
