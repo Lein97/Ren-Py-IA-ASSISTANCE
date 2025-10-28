@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Asistente de Código Ren'Py Avanzado</title>
+    <!-- Carga de Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Carga de Prism.js para resaltado de sintaxis (Usamos Python para simular Ren'Py) -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-twilight.min.css" rel="stylesheet" />
+    
+    <!-- Configuración del tema y fuente -->
+    <script>
+        tailwind.config = {
+            darkMode: 'class', // Habilitar modo oscuro basado en la clase 'dark' en el <html>
+            theme: {
+                extend: {
+                    colors: {
+                        'renpy-blue': '#2A3F54',
+                        'renpy-light': '#F0F4F7',
+                        'gemini-yellow': '#F4B400',
+                        'dark-bg': '#1f2937', 
+                        'dark-card': '#374151', 
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Custom styles for a cleaner UI */
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+            padding: 2rem 0;
+            transition: background-color 0.3s;
+        }
+        .main-layout {
+            display: flex;
+            max-width: 1200px;
+            width: 100%;
+        }
+        .chat-sidebar {
+            flex-shrink: 0;
+            width: 300px;
+            margin-right: 1.5rem;
+            
+        }
+        .chat-main {
+            flex-grow: 1;
+        }
+        
+        /* Dark mode specific styles */
+        .dark body {
+            background-color: #111827; /* Gray-900 */
+        }
+        .dark .bg-white {
+            background-color: #1f2937; /* Gray-800 */
+        }
+        .dark .text-gray-800 {
+            color: #f3f4f6; /* Gray-100 */
+        }
+        .dark .text-gray-500 {
+            color: #9ca3af; /* Gray-400 */
+        }
+        .dark .border-gray-300 {
+            border-color: #4b5563; /* Gray-600 */
+        }
+        .dark .bg-gray-100 {
+            background-color: #374151; /* Gray-700 */
+        }
+        .dark .text-gray-700 {
+            color: #d1d5db; /* Gray-300 */
+        }
+
+        /* Styling for chat history */
+        #historyContainer {
+            height: 500px; /* Fixed height for scrollable chat */
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+        
+        .chat-message {
+            max-width: 90%;
+            padding: 0.75rem 1rem;
+            border-radius: 0.75rem;
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .user-message {
+            align-self: flex-end;
+            background-color: #2563eb; /* Blue-600 */
+            color: white;
+            margin-left: auto;
+        }
+
+        .model-message {
+            align-self: flex-start;
+            background-color: #e5e7eb; /* Gray-200 */
+            color: #1f2937; /* Gray-900 */
+            margin-right: auto;
+        }
+
+        .dark .model-message {
+            background-color: #4b5563; /* Gray-600 */
+            color: #f3f4f6; /* Gray-100 */
+        }
+
+        /* Loading spinner animation */
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #F4B400; /* Yellow */
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Prism.js code block customization */
+        pre[class*="language-"] {
+            margin-top: 0.5rem;
+            margin-bottom: 0.5rem;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            font-size: 0.875rem; /* text-sm */
+            overflow-x: auto;
+        }
+
+        @media (max-width: 768px) {
+            .main-layout {
+                flex-direction: column;
+            }
+            .chat-sidebar {
+                width: 100%;
+                margin-right: 0;
+                margin-bottom: 1rem;
+            }
+            #historyContainer {
+                height: 300px;
+            }
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-gray-800">
+
+    <div class="main-layout p-4 sm:p-8 bg-white shadow-2xl rounded-xl">
+        
+        <!-- Sidebar de Chats -->
+        <aside class="chat-sidebar bg-gray-100 rounded-xl p-4 shadow-inner dark:bg-gray-700">
+            <div class="flex justify-between items-center mb-4 border-b pb-2">
+                <h2 class="text-xl font-bold text-renpy-blue dark:text-gray-200">Chats Guardados</h2>
+                <button onclick="createNewChat()" class="bg-renpy-blue text-white p-2 rounded-full hover:bg-renpy-blue/80 transition duration-200" title="Nuevo Chat">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                </button>
+            </div>
+            
+            <div id="loadingChats" class="text-center text-sm text-gray-500 dark:text-gray-400">Cargando chats...</div>
+            <div id="chatList" class="space-y-2 overflow-y-auto max-h-[calc(100vh-150px)]">
+                <!-- Los chats se insertarán aquí -->
+            </div>
+            
+            <div class="mt-4 pt-2 border-t border-gray-300 dark:border-gray-600">
+                <p class="text-xs text-gray-500 dark:text-gray-400">ID Usuario: <span id="userIdDisplay" class="font-mono text-xs break-all">Cargando...</span></p>
+            </div>
+        </aside>
+
+        <!-- Main Chat Area -->
+        <main class="chat-main bg-white dark:bg-gray-800 rounded-xl">
+            <header class="text-center mb-6 flex justify-between items-center">
+                <h1 id="chatTitle" class="text-2xl font-extrabold text-renpy-blue dark:text-white">Nuevo Chat</h1>
+                <div class="flex items-center space-x-2">
+                     <button id="darkModeToggle" onclick="toggleDarkMode()" class="p-2 rounded-full bg-gray-200 dark:bg-gray-600 text-gray-800 dark:text-gray-100 transition duration-200 hover:scale-105" title="Alternar Modo Oscuro">
+                        <!-- Icono de Sol / Luna (SVG) -->
+                        <svg id="moonIcon" class="w-6 h-6 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path></svg>
+                        <svg id="sunIcon" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.354 5.354l-.707-.707M5.707 5.707l-.707-.707M18.364 5.636l-.707.707M5.636 18.364l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+                    </button>
+                    <button onclick="deleteCurrentChat()" class="text-red-500 hover:text-red-700 p-2 rounded-full transition duration-200" title="Eliminar Chat Actual">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3m-3 0h14"></path></svg>
+                    </button>
+                </div>
+            </header>
+            
+            <!-- Chat History Area -->
+            <div class="mb-4">
+                <div id="historyContainer" class="bg-gray-100 p-4 rounded-xl border border-gray-200 dark:bg-gray-700 dark:border-gray-600 shadow-inner">
+                    <!-- Mensajes se insertan aquí -->
+                </div>
+            </div>
+
+            <!-- Input and Image Output Area -->
+            <div class="space-y-4">
+                <textarea id="prompt" rows="3" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-renpy-blue focus:border-renpy-blue shadow-inner resize-none dark:bg-gray-600 dark:border-gray-500 dark:text-white" placeholder="Escribe tu pregunta o pega tu código Ren'Py aquí..."></textarea>
+                
+                <!-- Dedicated Image Output Area -->
+                <div id="imageOutput" class="hidden text-center p-4 bg-gray-100 rounded-lg dark:bg-gray-700 border border-dashed border-gray-300 dark:border-gray-600">
+                    <h3 class="text-lg font-semibold mb-2 dark:text-gray-200">Asset Visual Generado</h3>
+                    <img id="generatedImage" class="w-64 h-64 mx-auto rounded-lg object-cover shadow-lg" alt="Imagen Generada por IA" src="" onerror="this.onerror=null; this.src='https://placehold.co/256x256/2A3F54/FFFFFF?text=IMAGEN'">
+                    <p class="text-xs mt-2 text-gray-500 dark:text-gray-400">Esta imagen es un ejemplo generado. No se puede guardar en Ren'Py directamente; debes usarla como referencia.</p>
+                </div>
+                
+                <button id="generateButton" onclick="generateCode()" class="w-full bg-renpy-blue hover:bg-renpy-blue/90 text-white font-semibold py-3 px-4 rounded-lg transition duration-200 shadow-md flex items-center justify-center">
+                    <span id="buttonText">Enviar Pregunta</span>
+                    <div id="loadingIndicator" class="spinner hidden ml-3"></div>
+                </button>
+            </div>
+
+            <!-- Error Message Box -->
+            <div id="errorBox" class="hidden mt-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded-lg dark:bg-red-900 dark:border-red-600 dark:text-red-300" role="alert">
+                <p id="errorMessage" class="text-sm font-medium"></p>
+            </div>
+        </main>
+
+    </div>
+
+    <!-- Script de Firebase y la Aplicación -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+    
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, deleteDoc, onSnapshot, collection, query, addDoc, serverTimestamp, orderBy, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // setLogLevel('debug'); // Descomentar para ver logs de Firestore
+
+        // Global variables provided by the Canvas environment
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const apiKey = ""; // API key will be automatically provided at runtime
+        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        let db = null;
+        let auth = null;
+        let userId = null;
+        let currentChatId = null;
+        let chatHistory = [];
+        let unsubscribeChats = null;
+
+        // UI Elements
+        const promptInput = document.getElementById('prompt');
+        const generateButton = document.getElementById('generateButton');
+        const buttonText = document.getElementById('buttonText');
+        const loadingIndicator = document.getElementById('loadingIndicator');
+        const historyContainer = document.getElementById('historyContainer');
+        const imageOutput = document.getElementById('imageOutput');
+        const generatedImage = document.getElementById('generatedImage');
+        const errorBox = document.getElementById('errorBox');
+        const errorMessage = document.getElementById('errorMessage');
+        const chatListElement = document.getElementById('chatList');
+        const chatTitleElement = document.getElementById('chatTitle');
+        const userIdDisplay = document.getElementById('userIdDisplay');
+        const loadingChatsElement = document.getElementById('loadingChats');
+        const moonIcon = document.getElementById('moonIcon');
+        const sunIcon = document.getElementById('sunIcon');
+        
+        const TEXT_MODEL_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+        const IMAGE_MODEL_URL = `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${apiKey}`;
+        const CHAT_COLLECTION_PATH = (uid) => `artifacts/${appId}/users/${uid}/renpy_chats`;
+
+
+        // ----------------------------------------------------
+        // FIREBASE SETUP AND AUTH
+        // ----------------------------------------------------
+
+        async function initFirebase() {
+            try {
+                const app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+
+                // Sign in using the custom token or anonymously if not available
+                if (initialAuthToken) {
+                    await signInWithCustomToken(auth, initialAuthToken);
+                } else {
+                    await signInAnonymously(auth);
+                }
+
+                // Set up auth state change listener
+                onAuthStateChanged(auth, (user) => {
+                    if (user) {
+                        userId = user.uid;
+                        userIdDisplay.textContent = userId;
+                        // Start listening to chats once authenticated
+                        setupChatListener();
+                    } else {
+                        console.error("User not authenticated.");
+                        userIdDisplay.textContent = 'ERROR_AUTH';
+                    }
+                });
+
+            } catch (error) {
+                console.error("Error initializing Firebase:", error);
+                errorMessage.textContent = `Error de inicialización: ${error.message}`;
+                errorBox.classList.remove('hidden');
+            }
+        }
+
+        // ----------------------------------------------------
+        // CHAT MANAGEMENT (Firestore CRUD)
+        // ----------------------------------------------------
+
+        function setupChatListener() {
+            if (unsubscribeChats) {
+                unsubscribeChats(); // Detiene el listener anterior
+            }
+            if (!userId) return;
+
+            const chatsRef = collection(db, CHAT_COLLECTION_PATH(userId));
+            // Note: Using client-side sorting instead of orderBy to avoid index errors
+            const q = query(chatsRef); 
+
+            unsubscribeChats = onSnapshot(q, (snapshot) => {
+                const chats = [];
+                snapshot.forEach(doc => {
+                    chats.push({ id: doc.id, ...doc.data() });
+                });
+
+                // Client-side sorting by updatedAt (descending)
+                chats.sort((a, b) => (b.updatedAt?.seconds || 0) - (a.updatedAt?.seconds || 0));
+
+                renderChatList(chats);
+                loadingChatsElement.classList.add('hidden');
+
+                if (!currentChatId && chats.length > 0) {
+                    // Load the most recently updated chat by default
+                    loadChat(chats[0].id, chats[0].title, chats[0].history || []);
+                } else if (!currentChatId && chats.length === 0) {
+                    // If no chats, create a new one automatically
+                    createNewChat('Bienvenido', false); 
+                }
+            }, (error) => {
+                console.error("Error listening to chats:", error);
+                errorMessage.textContent = 'Error al cargar chats: ' + error.message;
+                errorBox.classList.remove('hidden');
+            });
+        }
+        
+        async function createNewChat(title = 'Nuevo Chat', switchAfterCreate = true) {
+            if (!userId || !db) {
+                errorBox.classList.remove('hidden');
+                errorMessage.textContent = 'Error: Usuario no autenticado para crear chat.';
+                return;
+            }
+            
+            setLoading(true);
+            try {
+                const chatRef = collection(db, CHAT_COLLECTION_PATH(userId));
+                const newChat = {
+                    title: title,
+                    history: [{ role: "model", parts: [{ text: "¡Hola! ¿En qué te puedo ayudar con tu código Ren'Py?" }] }],
+                    createdAt: serverTimestamp(),
+                    updatedAt: serverTimestamp(),
+                };
+                const docRef = await addDoc(chatRef, newChat);
+                if (switchAfterCreate) {
+                    loadChat(docRef.id, newChat.title, newChat.history);
+                }
+            } catch (e) {
+                console.error("Error creating new chat:", e);
+                errorMessage.textContent = 'Error al crear nuevo chat: ' + e.message;
+                errorBox.classList.remove('hidden');
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        function loadChat(chatId, title, history) {
+            currentChatId = chatId;
+            chatTitleElement.textContent = title;
+            chatHistory = history || [];
+            renderHistory();
+            
+            // Highlight the selected chat in the list
+            document.querySelectorAll('.chat-item').forEach(el => {
+                el.classList.remove('bg-renpy-blue/10', 'font-semibold');
+                el.classList.add('hover:bg-gray-200', 'dark:hover:bg-gray-600');
+            });
+            const selectedChat = document.getElementById(`chat-${chatId}`);
+            if (selectedChat) {
+                selectedChat.classList.add('bg-renpy-blue/10', 'font-semibold');
+                selectedChat.classList.remove('hover:bg-gray-200', 'dark:hover:bg-gray-600');
+            }
+            imageOutput.classList.add('hidden'); // Clear image output on switch
+        }
+
+        async function saveChat(newTurn) {
+            if (!currentChatId || !userId || !db) return;
+            
+            chatHistory.push(newTurn);
+
+            try {
+                const docRef = doc(db, CHAT_COLLECTION_PATH(userId), currentChatId);
+                const updateData = {
+                    history: chatHistory,
+                    updatedAt: serverTimestamp(),
+                };
+                
+                // If this is the first real message, generate a title
+                if (chatHistory.length === 2 && newTurn.role === 'user') {
+                     const promptText = newTurn.parts[0].text.substring(0, 50).trim() + '...';
+                     updateData.title = promptText;
+                     chatTitleElement.textContent = promptText;
+                }
+
+                await updateDoc(docRef, updateData);
+            } catch (e) {
+                console.error("Error saving chat turn:", e);
+                // Keep history in memory but warn user
+                errorBox.classList.remove('hidden');
+                errorMessage.textContent = 'Advertencia: No se pudo guardar la conversación en la nube.';
+            }
+        }
+
+        async function deleteCurrentChat() {
+            if (!currentChatId || !userId || !db) return;
+            
+            if (window.confirm("¿Estás seguro de que quieres eliminar este chat?")) {
+                try {
+                    setLoading(true);
+                    const docRef = doc(db, CHAT_COLLECTION_PATH(userId), currentChatId);
+                    await deleteDoc(docRef);
+                    
+                    // Reset current state
+                    currentChatId = null;
+                    chatHistory = [];
+                    chatTitleElement.textContent = 'Chat Eliminado';
+                    renderHistory();
+                    imageOutput.classList.add('hidden');
+                    
+                    // Listener will automatically pick up the next chat or create a new one
+                } catch (e) {
+                    console.error("Error deleting chat:", e);
+                    errorMessage.textContent = 'Error al eliminar chat: ' + e.message;
+                    errorBox.classList.remove('hidden');
+                } finally {
+                    setLoading(false);
+                }
+            }
+        }
+
+        // ----------------------------------------------------
+        // UI RENDERING AND UTILITIES
+        // ----------------------------------------------------
+
+        function renderChatList(chats) {
+            chatListElement.innerHTML = '';
+            if (chats.length === 0) {
+                chatListElement.innerHTML = '<p class="text-sm text-gray-500 dark:text-gray-400">No hay chats. Crea uno nuevo.</p>';
+                return;
+            }
+
+            chats.forEach(chat => {
+                const chatEl = document.createElement('div');
+                chatEl.id = `chat-${chat.id}`;
+                chatEl.className = `chat-item p-2 rounded-lg cursor-pointer transition duration-150 text-sm truncate ${currentChatId === chat.id ? 'bg-renpy-blue/10 font-semibold' : 'hover:bg-gray-200 dark:hover:bg-gray-600'}`;
+                chatEl.textContent = chat.title;
+                chatEl.onclick = () => loadChat(chat.id, chat.title, chat.history);
+                chatListElement.appendChild(chatEl);
+            });
+        }
+
+        function renderHistory() {
+            historyContainer.innerHTML = '';
+            if (chatHistory.length === 0) {
+                 const messageElement = document.createElement('div');
+                 messageElement.innerHTML = `<p class="text-sm text-gray-500 dark:text-gray-400 self-center mx-auto text-center">¡Hola! ¿En qué te puedo ayudar con tu código Ren'Py?</p>`;
+                 historyContainer.appendChild(messageElement);
+                 return;
+            }
+
+            chatHistory.forEach(msg => {
+                const text = msg.parts[0].text;
+                const role = msg.role;
+                displayMessage(text, role);
+            });
+        }
+
+        function displayMessage(text, role) {
+            const messageElement = document.createElement('div');
+            messageElement.className = `chat-message ${role === 'user' ? 'user-message' : 'model-message'}`;
+            
+            // To correctly render markdown (including code blocks) in a chat bubble
+            const markdownContainer = document.createElement('div');
+            markdownContainer.innerHTML = parseMarkdown(text);
+            messageElement.appendChild(markdownContainer);
+
+            historyContainer.appendChild(messageElement);
+            // Scroll to the bottom
+            historyContainer.scrollTop = historyContainer.scrollHeight;
+
+            // Apply syntax highlighting after adding the element
+            Prism.highlightAll();
+        }
+
+        function parseMarkdown(text) {
+            // Simple Markdown parsing for code blocks and paragraphs in the chat bubble
+            let html = text.replace(/```(renpy|python)?([\s\S]*?)```/g, function(match, lang, content) {
+                const codeLang = 'python'; // Default to python for Ren'Py
+                return `<pre class="language-${codeLang}"><code class="language-${codeLang}">${content.trim()}</code></pre>`;
+            });
+            // Simple paragraph breaks
+            html = html.replace(/\n\n/g, '</p><p>');
+            html = html.replace(/\n/g, '<br>');
+            return `<p class="text-sm">${html}</p>`;
+        }
+        
+        // ----------------------------------------------------
+        // Dark Mode Logic
+        // ----------------------------------------------------
+
+        function toggleDarkMode() {
+            const isDark = document.documentElement.classList.toggle('dark');
+            localStorage.setItem('theme', isDark ? 'dark' : 'light');
+            updateDarkModeIcons(isDark);
+        }
+
+        function updateDarkModeIcons(isDark) {
+            moonIcon.classList.toggle('hidden', !isDark);
+            sunIcon.classList.toggle('hidden', isDark);
+        }
+
+        // Initialize theme based on system preference or local storage
+        if (localStorage.getItem('theme') === 'dark' || (!localStorage.getItem('theme') && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark');
+            updateDarkModeIcons(true);
+        } else {
+            updateDarkModeIcons(false);
+        }
+
+
+        // ----------------------------------------------------
+        // API Utilities (Fetch & Loading)
+        // ----------------------------------------------------
+
+        function setLoading(isLoading) {
+            generateButton.disabled = isLoading;
+            promptInput.disabled = isLoading;
+            buttonText.textContent = isLoading ? 'Generando...' : 'Enviar Pregunta';
+            loadingIndicator.classList.toggle('hidden', !isLoading);
+            errorBox.classList.add('hidden');
+        }
+
+        async function fetchWithBackoff(url, options, maxRetries = 5) {
+            for (let attempt = 0; attempt < maxRetries; attempt++) {
+                try {
+                    const response = await fetch(url, options);
+                    if (response.status !== 429) { return response; }
+                    const delay = Math.pow(2, attempt) * 1000 + Math.random() * 1000;
+                    console.warn(`Rate limit hit, retrying in ${delay / 1000}s... (Attempt ${attempt + 1})`);
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                } catch (e) {
+                    if (attempt === maxRetries - 1) throw e;
+                    const delay = Math.pow(2, attempt) * 1000 + Math.random() * 1000;
+                    console.error(`Fetch failed, retrying in ${delay / 1000}s... (Attempt ${attempt + 1})`, e);
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                }
+            }
+            throw new Error("Failed to fetch after multiple retries.");
+        }
+        
+        // ----------------------------------------------------
+        // MAIN GENERATION LOGIC
+        // ----------------------------------------------------
+
+        const systemPrompt = `You are an expert programming assistant specializing in the Ren'Py visual novel engine. Your goal is to help the user with code generation, code review, and logical explanations.
+            1. All communication and code explanations must be in Spanish.
+            2. When providing code, always use a markdown code block (use 'python' as the language identifier for Ren'Py code).
+            3. If the user asks you to review or optimize code, provide the revised/optimized block and explain the changes.
+            4. If the user asks to generate a visual asset (character image, background, etc.), acknowledge the request and inform the user that a separate process will handle the image generation, but immediately provide the required Ren'Py code for the asset definition.`;
+
+        async function generateTextOnly(userPrompt) {
+            if (!currentChatId) {
+                errorBox.classList.remove('hidden');
+                errorMessage.textContent = 'Por favor, espera a que se cargue el chat o crea uno nuevo.';
+                return;
+            }
+
+            const userTurn = { role: "user", parts: [{ text: userPrompt }] };
+            // Temporarily update UI to show user's message
+            displayMessage(userPrompt, 'user');
+            setLoading(true);
+
+            // The chat history includes the new user prompt
+            const historyForAPI = [...chatHistory, userTurn];
+            
+            const payload = {
+                contents: historyForAPI, 
+                systemInstruction: { parts: [{ text: systemPrompt }] },
+            };
+
+            try {
+                const response = await fetchWithBackoff(TEXT_MODEL_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const result = await response.json();
+
+                if (!response.ok) {
+                    const errorDetail = result.error?.message || response.statusText;
+                    throw new Error(`Error de la API de Texto: ${errorDetail}`);
+                }
+
+                const generatedText = result.candidates?.[0]?.content?.parts?.[0]?.text;
+
+                if (generatedText) {
+                    const modelTurn = { role: "model", parts: [{ text: generatedText }] };
+                    
+                    // Save both turns to Firestore
+                    await saveChat(userTurn);
+                    await saveChat(modelTurn);
+
+                    // Display model response
+                    displayMessage(generatedText, 'model');
+                    
+                    // Check if an image generation needs to be triggered
+                    if (isImageRequest(userPrompt)) {
+                        const imagePrompt = extractImagePrompt(userPrompt);
+                        await generateImage(imagePrompt);
+                    }
+                } else {
+                    const errorMessage = 'Lo siento, no pude generar una respuesta. Intenta de nuevo.';
+                    displayMessage(errorMessage, 'model');
+                    // Do not save a failed model response, but save the user prompt
+                    await saveChat(userTurn);
+                }
+            } catch (error) {
+                console.error("Gemini API Error:", error);
+                errorBox.classList.remove('hidden');
+                errorMessage.textContent = `Error al generar texto: ${error.message}.`;
+            } finally {
+                setLoading(false);
+            }
+        }
+        
+        // ----------------------------------------------------
+        // IMAGE GENERATION LOGIC (Imagen 3.0)
+        // ----------------------------------------------------
+        
+        function isImageRequest(prompt) {
+            const keywords = ['imagen', 'dibujo', 'diseña', 'genera un asset', 'foto de', 'personaje'];
+            return keywords.some(keyword => prompt.toLowerCase().includes(keyword));
+        }
+
+        function extractImagePrompt(prompt) {
+             const defaultPrompt = "Un personaje de novela visual, estilo anime, alta calidad, fondos borrosos, cuerpo completo.";
+             // Simple extraction logic (can be improved by LLM refinement)
+             const lowerPrompt = prompt.toLowerCase();
+             if (lowerPrompt.includes("personaje llamado")) {
+                 return prompt.substring(lowerPrompt.indexOf("personaje llamado") + 17).trim();
+             }
+             if (lowerPrompt.includes("imagen de")) {
+                 return prompt.substring(lowerPrompt.indexOf("imagen de") + 9).trim();
+             }
+             return defaultPrompt; 
+        }
+        
+        async function generateImage(imagePrompt) {
+            imageOutput.classList.remove('hidden');
+            generatedImage.src = 'https://placehold.co/256x256/2A3F54/FFFFFF?text=CARGANDO...';
+
+            // 1. Refine the prompt (same logic as before)
+            const refinementPrompt = `Refina la siguiente solicitud del usuario para un generador de imágenes de alta calidad (Imagen 3.0) en inglés. Debe ser descriptivo, incluir detalles de estilo (anime, visual novel, high quality) y evitar contenido NSFW. Solicita solo el texto refinado: "${imagePrompt}"`;
+            
+            let finalImagePrompt = imagePrompt;
+            try {
+                const refinePayload = { contents: [{ parts: [{ text: refinementPrompt }] }] };
+                const refineResponse = await fetchWithBackoff(TEXT_MODEL_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(refinePayload) });
+                const refineResult = await refineResponse.json();
+                const refinedText = refineResult.candidates?.[0]?.content?.parts?.[0]?.text;
+                if (refinedText) { finalImagePrompt = refinedText.trim(); }
+            } catch (e) {
+                console.error("Error refining image prompt:", e);
+            }
+
+            // 2. Call Imagen 3.0
+            const payload = { instances: [{ prompt: finalImagePrompt }], parameters: { "sampleCount": 1 } };
+            
+            try {
+                const response = await fetchWithBackoff(IMAGE_MODEL_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const result = await response.json();
+
+                if (!response.ok) {
+                    const errorDetail = result.error?.message || response.statusText;
+                    throw new Error(`Error de la API de Imagen: ${errorDetail}`);
+                }
+
+                const base64Data = result.predictions?.[0]?.bytesBase64Encoded;
+                
+                if (base64Data) {
+                    generatedImage.src = `data:image/png;base64,${base64Data}`;
+                } else {
+                    generatedImage.src = 'https://placehold.co/256x256/FF0000/FFFFFF?text=FALLO+IMAGEN';
+                    throw new Error("Imagen generada sin datos válidos.");
+                }
+
+            } catch (error) {
+                console.error("Imagen API Error:", error);
+                errorBox.classList.remove('hidden');
+                errorMessage.textContent = `Error al generar la imagen: ${error.message}.`;
+                generatedImage.src = 'https://placehold.co/256x256/FF0000/FFFFFF?text=FALLO+IMAGEN';
+            }
+        }
+
+        // ----------------------------------------------------
+        // MAIN EXECUTION
+        // ----------------------------------------------------
+
+        window.generateCode = async function() {
+            const userPrompt = promptInput.value.trim();
+            if (!userPrompt) {
+                errorBox.classList.remove('hidden');
+                errorMessage.textContent = 'Por favor, introduce tu pregunta de programación para Ren\'Py.';
+                return;
+            }
+            promptInput.value = '';
+            imageOutput.classList.add('hidden'); // Clear previous image
+
+            await generateTextOnly(userPrompt);
+        }
+        
+        // Expose functions globally for HTML buttons
+        window.createNewChat = createNewChat;
+        window.deleteCurrentChat = deleteCurrentChat;
+        window.toggleDarkMode = toggleDarkMode;
+
+        initFirebase();
+    </script>
+</body>
+</html>
+
